@@ -24,6 +24,16 @@ module Sendbird
         Response.new(response.status, response.body)
       end
     end
+    
+    PUBLIC_METHODS.each do |method|
+      next if method == :get || method == :delete
+      define_method("#{method}_with_file") do |path: , params: nil , body: nil|
+        params, body, app = get_app_from_params_or_body(params, body)
+        fail ApiKeyMissingError.new(api_key_message) unless api_key(app)
+        response = api_token_request_with_file(method: method, path: path, params: params, body: body)
+        Response.new(response.status, response.body)
+      end
+    end
 
     def build_url(*args)
       if args.any?
@@ -33,7 +43,6 @@ module Sendbird
         self.const_get('ENDPOINT')
       end
     end
-
 
     private
 
@@ -63,6 +72,7 @@ module Sendbird
 
     def conn
       @conn ||= Faraday.new(url: Sendbird::Configuration::SENDBIRD_ENDPOINT) do |c|
+                  c.request :multipart
                   c.request  :url_encoded
                   c.adapter  Faraday.default_adapter
                 end
@@ -70,6 +80,7 @@ module Sendbird
 
     def http_basic_conn
       @http_basic_conn ||= Faraday.new(url: Sendbird::Configuration::SENDBIRD_ENDPOINT) do |c|
+                  c.request :multipart
                   c.request  :url_encoded
                   c.adapter  Faraday.default_adapter
                   c.basic_auth(sendbird_user, sendbird_password)
@@ -90,6 +101,16 @@ module Sendbird
         req.headers['Api-Token'] = @api_key
         req.headers['Content-Type'] = 'application/json, charset=utf8'
         req.body = body.to_json if body
+      end
+    end
+    
+    def api_token_request_with_file(method:, path:, params:, body:)
+      conn.send(method) do |req|
+        req.url path, params
+        req.options.timeout = 240
+        req.options.open_timeout = 240
+        req.headers['Api-Token'] = @api_key
+        req.body = body if body
       end
     end
 

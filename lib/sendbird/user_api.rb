@@ -11,6 +11,10 @@ module Sendbird
       def create(body)
         post(path: build_url, body: body)
       end
+      
+      def destroy(user_id)
+        delete(path: build_url(user_id))
+      end
 
       def list(params={})
         get(path: build_url, params: params)
